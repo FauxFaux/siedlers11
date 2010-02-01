@@ -341,7 +341,7 @@ inline HRESULT LoadShader(char* file, char* profile, ID3D10Blob** shaderBlob)
 	//D3D10_SHADER_DEBUG | D3D10_SHADER_SKIP_OPTIMIZATION
 
 	ID3D10Blob* errorsBlob;
-	HRESULT hr = D3DXCompileFromMemory(srcData, size, NULL, NULL, NULL, "main", profile, D3D10_SHADER_OPTIMIZATION_LEVEL3, 0, NULL, shaderBlob, &errorsBlob, NULL);
+	HRESULT hr = D3DXCompileFromMemory(srcData, size, NULL, NULL, NULL, "main", profile, D3D10_SHADER_DEBUG | D3D10_SHADER_SKIP_OPTIMIZATION, 0, NULL, shaderBlob, &errorsBlob, NULL);
 
 	if(errorsBlob)
 	{

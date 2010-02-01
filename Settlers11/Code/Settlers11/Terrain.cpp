@@ -70,17 +70,17 @@ PatternInfo patternInfos[] =
 
 
 
-uint GetIndex(uint pattern)
+char GetIndex(uint pattern)
 {
-	static const int numPatterns = sizeof(patternInfos) / sizeof(PatternInfo);
+	static const char numPatterns = sizeof(patternInfos) / sizeof(PatternInfo);
 
-	for(int i = 0; i < numPatterns; i++)
+	for(char i = 0; i < numPatterns; i++)
 	{
 		if(patternInfos[i].id == pattern)
 			return i;
 	}
 
-	return 0xFFFFFFFF;
+	return 0xFF;
 }
 
 uint GetPatternArrayOffset(int x, int z, int vIdx, int width)
@@ -144,6 +144,125 @@ uint GetHeightArrayOffset(int x, int z, int row, int col, int fineWidth)
 const float xDiff = 1.5f;
 const float zDiff = 1.299f;
 
+void CalculateNormal(uint fineX, uint fineZ, int* heights, uint fineWidth, uint fineHeight, Float3& normal)
+{
+	Float3 total(0,0,0);
+
+	Float3 origin(0,0,0);
+
+	Float3 points[6];	//Up right, right, down right, down left, left, up left.
+	bool valid[6] = {0};
+
+	points[0] = Float3(0.5f * xDiff, 0, zDiff);
+	points[1] = Float3(xDiff, 0, 0);
+	points[2] = Float3(0.5f * xDiff, 0, -zDiff);
+	points[3] = Float3(-0.5f * xDiff, 0, -zDiff);
+	points[4] = Float3(-xDiff, 0, 0);
+	points[5] = Float3(-0.5f* xDiff, 0, zDiff);
+
+	uint originIndex = fineX + fineZ * fineWidth;
+
+	origin[1] = heights[originIndex] / 1000.0f;
+
+	if(fineZ < fineHeight - 1)
+	{
+		if(fineZ % 8 < 4)
+		{
+			points[0][1] = heights[originIndex + fineWidth] / 1000.0f;	valid[0] = true;
+		}
+		else
+		{
+			if(fineX < fineWidth - 1)
+				points[0][1] = heights[originIndex + fineWidth + 1] / 1000.0f;
+		}
+	}
+
+	if(fineX < fineWidth - 1)		
+	{
+		points[1][1] = heights[originIndex + 1] / 1000.0f; valid[1] = true;
+	}
+
+	if(fineZ > 0)
+	{
+		if(fineZ % 8 >= 1 && fineZ % 8 <= 4) 
+		{
+			points[2][1] = heights[originIndex - fineWidth + 1] / 1000.0f;
+		}
+		else
+		{
+			points[2][1] = heights[originIndex - fineWidth] / 1000.0f;
+		}
+		valid[2] = true;
+	}
+
+	if(fineZ > 0)
+	{
+		if(fineZ % 8 >= 1 && fineZ % 8 <= 4)
+		{
+			points[3][1] = heights[originIndex - fineWidth] / 1000.0f; valid[3] = true;
+		}
+		else
+		{
+			if(fineX > 0)
+			{
+				points[3][1] = heights[originIndex - fineWidth - 1] / 1000.0f; valid[3] = true;
+			}
+		}
+	}
+
+	if(fineX > 0)		
+	{
+		points[4][1] = heights[originIndex - 1] / 1000.0f; valid[4] = true;
+	}
+
+	if(fineZ < fineHeight - 1)
+	{
+		if(fineZ % 8 < 4)
+		{
+			if(fineX > 0)
+			{
+				points[5][1] = heights[originIndex + fineWidth - 1] / 1000.0f; valid[5] = true;
+			}
+		}
+		else
+		{
+			points[5][1] = heights[originIndex + fineWidth] / 1000.0f; valid[5] = true;
+		}
+	}
+
+	int numValid = 0;
+
+	for(int i = 0; i < 6; i++)
+	{
+		uint iA = i;
+		uint iB = (i + 1) % 6;
+
+		if(valid[iA] && valid[iB])
+		{
+			Float3 edgeA = points[iA] - origin;
+			Float3 edgeB = points[iB] - origin;
+			Float3 crossed = edgeA.Cross(edgeB);
+			//crossed.Normalize();
+
+			total += crossed;
+			numValid++;
+		}	
+	}
+
+	assert(numValid >= 1);
+
+	//total /= numValid;
+	normal = total;
+	normal.Normalize();
+
+	if(fineX == 4 && fineZ == 0)
+	{
+		Float3 d = normal;
+		int zzz = 0;
+	}
+	//float length = 
+}
+
 Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilename) : mTerrainTexture(NULL)
 {
 	uint numRecognisedPatterns = sizeof(patternInfos) / sizeof(PatternInfo);
@@ -174,7 +293,7 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	scaleViewDesc.Buffer.ElementWidth = numRecognisedPatterns;
 	bufferResult = device->CreateShaderResourceView(mScaleBuffer, &scaleViewDesc, &mScaleView);
 
-	//context->VSSetShaderResources(0, 1, &mScaleView);
+	context->VSSetShaderResources(0, 1, &mScaleView);
 
 	D3D_TEXTURE2D_DESC desc;
 	desc.ArraySize = numRecognisedPatterns;
@@ -201,40 +320,10 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	arrayHR = device->CreateShaderResourceView(mTerrainTexture, &viewDesc, &mTerrainView);
 
 	FILE* mapFile = fopen(mapFilename, "rb");
-	fseek(mapFile, 12, SEEK_CUR);
-
-	UINT numStructs;
-	fread(&numStructs, sizeof(numStructs), 1, mapFile);
-
-	const int structSize = 20;
-	fseek(mapFile, numStructs * structSize, SEEK_CUR);
-
-	UINT mapNameLength;
-	fread(&mapNameLength, sizeof(mapNameLength), 1, mapFile);
-
-	char mapName[32];
-	ZeroMemory(mapName, 32);
-	fread(mapName, mapNameLength, 1, mapFile);
-
 	fread(&mLogicalWidth, 4, 1, mapFile);
 	fread(&mLogicalHeight, 4, 1, mapFile);
-
-	//unsigned int numBigTriangles = mLogicalWidth * 2 * mLogicalHeight;
-	
-
-	fseek(mapFile, 336 + (numStructs * structSize) + mapNameLength, SEEK_SET);
-
 	fread(&mFineWidth, 4, 1, mapFile);
-	fread(&mFineHeight, 4, 1, mapFile);
-	assert(mFineWidth == mLogicalWidth * 4 + 1);
-	assert(mFineHeight == mLogicalHeight * 4 + 1);
-	
-	//mLogicalWidth = 4;
-	//mLogicalHeight = 4;
-	//	mFineHeight = 17;
-	//mFineWidth = 17;
-
-	unsigned int numVertices = mFineWidth * mFineHeight;
+	fread(&mFineHeight, 4, 1, mapFile);	
 	
 	mNumHeights = mFineWidth * mFineHeight;
 	mHeights = new int[mNumHeights];
@@ -242,6 +331,7 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	//mDist = new std::tr1::uniform_int<int>(0, mNumHeights);
 
 	fread(mHeights, sizeof(int), mNumHeights, mapFile);
+	
 
 	D3D_BUFFER_DESC heightDesc;
 	heightDesc.BindFlags = D3D_BIND_SHADER_RESOURCE;
@@ -262,21 +352,18 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	heightViewDesc.Buffer.ElementWidth = mNumHeights;
 
 	heightHR = device->CreateShaderResourceView(mHeightBuffer, &heightViewDesc, &mHeightView);
-	context->VSSetShaderResources(0, 1, &mHeightView);
+	context->VSSetShaderResources(1, 1, &mHeightView);
 
-	/*fseek(mapFile, 4 * sizeof(UINT), SEEK_CUR);
+	uint numPatterns = mLogicalWidth * mLogicalHeight;
+	uint* patterns = new unsigned int[numPatterns];
 
-	unsigned int numPatterns;
-	fread(&numPatterns, sizeof(UINT), 1, mapFile);
-
-	unsigned int* patterns = new unsigned int[numPatterns];
-	fread(patterns, sizeof(unsigned int), numPatterns, mapFile);
+	fread(patterns, sizeof(uint), numPatterns, mapFile);
 
 	for(int i = 0; i < numPatterns; i++)
 	{
 		uint idx = GetIndex(patterns[i]);
 
-		if(idx != 0xFFFFFFFF)
+		if(idx != 0xFF)
 		{
 			if(patternInfos[idx].loaded == false)
 			{
@@ -309,25 +396,172 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 		{
 			printf("%x not found.\n", patterns[i]);
 		}
-	}*/
+	}
 
 	fclose(mapFile);
 
+	uint numSubVerts = 15;
+	uint numSubTriangles = 16;
+	uint numBigTriangles = mLogicalWidth * 2 * mLogicalHeight;
+
+	unsigned int numVertices = numBigTriangles * numSubVerts;
 	mVertices = new TerrainVertex[numVertices];
+
 	uint idx = 0;
 
-	for(int z = 0; z < mFineWidth; z++)
+	float weights[45] = 
 	{
-		float xOffset = (z % 2 == 0) ? 0 : xDiff / 2;
+		1,		0,		0,
+		0.75f,	0.25f,	0,
+		0.5f,	0.5f,	0,
+		0.25f,	0.75f,	0,
+		0,		1,		0,
+		0.75f,	0,		0.25f,
+		0.5f,	0.25f,	0.25f,
+		0.25f,	0.5f,	0.25f,
+		0,		0.75f,	0.25f,
+		0.5f,	0,		0.5f,
+		0.25f,	0.25f,	0.5f,
+		0,		0.5f,	0.5f,
+		0.25f,	0,		0.75f,
+		0,		0.25f,	0.75f,
+		0,		0,		1
+	};
 
-		for(int x = 0; x < mFineWidth; x++)
+	for(int z = 0; z < mLogicalHeight; z++)
+	{
+		for(int x = 0; x < mLogicalWidth; x++)
 		{
-			mVertices[idx].x = (x * xDiff) + xOffset;
-			//mVertices[idx].y = ((float)mHeights[z * mFineWidth + x]) / 1000;
-			mVertices[idx].hIdx = z * mFineWidth + x;
-			mVertices[idx].z = z * zDiff;
+			uint matIdIdx[3];
+			matIdIdx[0] = z * mLogicalWidth + x;
+			matIdIdx[1] = matIdIdx[0] + 1;
+			matIdIdx[2] = matIdIdx[0] + mLogicalWidth;
 
-			idx++;
+			if(z % 2 == 0)
+			{
+				//Pointing up.
+				for(int row = 0; row < 5; row++)
+				{
+					for(int col = 0; col < 5 - row; col++)
+					{
+						uint xCoord = (x * 4.0f) + col;
+						uint zCoord = (z * 4.0f) + row;
+
+						mVertices[idx].position[0] = (xCoord + (row * 0.5f)) * xDiff;
+						mVertices[idx].position[1] = (z * mFineWidth * 4.0f) + (row * mFineWidth) + ((x * 4.0f) + col);
+						mVertices[idx].position[2] = zCoord * zDiff;
+
+						CalculateNormal(xCoord, zCoord, mHeights, mFineWidth, mFineHeight, mVertices[idx].normal);
+
+						if(idx == 4)
+						{
+							int zz = 0;
+						}
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].blendWeights[i] = weights[(idx % 15) * 3 + i];
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].matIDs[i] = GetIndex(patterns[matIdIdx[i]]);
+
+						idx++;
+					}
+				}
+
+				matIdIdx[0] = (z+1) * mLogicalWidth + x;
+				matIdIdx[1] = matIdIdx[0] + 1;
+				matIdIdx[2] = matIdIdx[1] - mLogicalWidth;
+
+				//Pointing down.
+				for(int row = 0; row < 5; row++)
+				{
+					for(int col = 0; col < 5 - row; col++)
+					{
+						uint xCoord = (x * 4.0f) + col;
+						uint zCoord = ((z+1) * 4.0f) - row;
+
+						mVertices[idx].position[0] = (xCoord + 2 + (row * 0.5f)) * xDiff;
+						mVertices[idx].position[1] = ((z+1) * mFineWidth * 4.0f) - (row * mFineWidth) + ((x * 4.0f) + col) + row;
+						mVertices[idx].position[2] = zCoord * zDiff;
+
+						
+
+						CalculateNormal(xCoord + row, zCoord, mHeights, mFineWidth, mFineHeight, mVertices[idx].normal);
+
+						if(idx == 29)
+						{
+							int zz = 0;
+						}
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].blendWeights[i] = weights[(idx % 15) * 3 + i];
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].matIDs[i] = GetIndex(patterns[matIdIdx[i]]);
+
+						idx++;
+					}
+				}	
+			}
+			else
+			{
+				uint matIdIdx[3];
+				matIdIdx[0] = (z + 1) * mLogicalWidth + x;
+				matIdIdx[1] = matIdIdx[0] + 1;
+				matIdIdx[2] = matIdIdx[0] - mLogicalWidth;
+
+				//Pointing down.
+				for(int row = 0; row < 5; row++)
+				{
+					for(int col = 0; col < 5 - row; col++)
+					{
+						uint xCoord = (x * 4.0f) + col;
+						uint zCoord = ((z+1) * 4.0f) - row;
+
+						mVertices[idx].position[0] = (xCoord + (row * 0.5f)) * xDiff;
+						mVertices[idx].position[1] = ((z+1) * mFineWidth * 4.0f) - (row * mFineWidth) + ((x * 4.0f) + col);
+						mVertices[idx].position[2] = zCoord * zDiff;
+
+						CalculateNormal(xCoord, zCoord, mHeights, mFineWidth, mFineHeight, mVertices[idx].normal);
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].blendWeights[i] = weights[(idx % 15) * 3 + i];
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].matIDs[i] = GetIndex(patterns[matIdIdx[i]]);
+
+						idx++;
+					}
+				}
+
+				matIdIdx[0] = z * mLogicalWidth + x;
+				matIdIdx[1] = matIdIdx[0] + 1;
+				matIdIdx[2] = matIdIdx[1] + mLogicalWidth;
+
+				//Pointing up.
+				for(int row = 0; row < 5; row++)
+				{
+					for(int col = 0; col < 5 - row; col++)
+					{
+						uint xCoord = (x * 4.0f) + col;
+						uint zCoord = (z * 4.0f) + row;
+
+						mVertices[idx].position[0] = (xCoord + 2 + (row * 0.5f)) * xDiff;
+						mVertices[idx].position[1] = (z * mFineWidth * 4.0f) + (row * mFineWidth) + ((x * 4.0f) + col) + row;
+						mVertices[idx].position[2] = zCoord * zDiff;
+
+						CalculateNormal(xCoord + row, zCoord, mHeights, mFineWidth, mFineHeight, mVertices[idx].normal);
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].blendWeights[i] = weights[(idx % 15) * 3 + i];
+
+						for(int i = 0; i < 3; i++)
+							mVertices[idx].matIDs[i] = GetIndex(patterns[matIdIdx[i]]);
+
+						idx++;
+					}
+				}
+			}
 		}
 	}
 
@@ -336,125 +570,53 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	
 	HRESULT hr = device->CreateBuffer(&vbDesc, &vbInitData, &mVB);
 	
-
-	/*mNumIndices = (mFineWidth * 2) * (mFineHeight - 1) + (mFineHeight - 1);
-	unsigned int* indices = new unsigned int[mNumIndices];*/
-
-	idx = 0;
-
-	/*for(uint z = 0; z < mFineHeight - 1; z++)
-	{
-		if(z % 2 == 0)
-		{
-			for(uint x = 0; x < mFineWidth; x++)
-			{
-				indices[idx++] = (z * mFineWidth) + x;
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-			}
-		}
-		else
-		{
-			for(uint x = 0; x < mFineWidth; x++)
-			{
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-				indices[idx++] = (z * mFineWidth) + x;
-			}
-		}
-
-		indices[idx++] = 0xFFFFFFFF;
-	}*/
-
 	const int numRegionsWidth = 20;
 	const int numRegionsHeight = 20;
 	const int regionWidth = (mFineWidth - 1) / numRegionsWidth;
 	const int regionHeight = (mFineHeight - 1) / numRegionsHeight;
 
-	/*for(uint z = 0; z < mFineHeight - 1; z++)
+	const uint R = 0xFFFFFFFF;
+	const int numIndicesPerTriangle = 28;
+	
+	
+	uint triIndices0[numIndicesPerTriangle] = 
 	{
-		if(z % 2 == 0)
-		{
-			for(uint x = 0; x < mFineWidth; x++)
-			{
-				indices[idx++] = (z * mFineWidth) + x;
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-			}
-		}
-		else
-		{
-			for(int x = mFineWidth - 1; x >= 0; x--)
-			{
-				indices[idx++] = (z * mFineWidth) + x;
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-			}
-		}
+		0, 5, 1, 6, 2, 7, 3, 8, 4, R,
+		5, 9, 6, 10, 7, 11, 8, R,
+		9, 12, 10, 13, 11, R,
+		12, 14, 13, R
+	};
 
-		indices[idx++] = 0xFFFFFFFF;
-	}*/
+	uint triIndices1[numIndicesPerTriangle] = 
+	{
+		4, 8, 3, 7, 2, 6, 1, 5, 0, R,
+		8, 11, 7, 10, 6, 9, 5, R,
+		11, 13, 10, 12, 9, R,
+		13, 14, 12, R
+	};
 
-	int indicesPerRegionRow = (regionWidth + 1) * 2 + 2;
-	int indicesPerRegion = indicesPerRegionRow * regionHeight;
+	uint indexOffset = 0;
 
-	mNumIndices = (numRegionsWidth * numRegionsHeight) * indicesPerRegion;
+	mNumIndices = (numIndicesPerTriangle * (numBigTriangles));// + ((numIndicesPerTriangle + 1) * (numBigTriangles / 2));
 	unsigned int* indices = new unsigned int[mNumIndices];
 
-	for(int rz = 0; rz < numRegionsHeight; rz++)
+	idx = 0;
+
+	for(int z = 0; z < mLogicalHeight; z++)
 	{
-		for(int rx = 0; rx < numRegionsWidth; rx++)
+		for(int x = 0; x < mLogicalWidth * 2; x++)
 		{
-			int xOffset = rx * regionWidth;
-			int zOffset = rz * regionHeight;
-
-			for(int z = 0; z < regionHeight; z++)
+			for(int j = 0; j < numIndicesPerTriangle; j++)
 			{
-				int realZ = zOffset + z;
-				
-				for(int x = 0; x < regionWidth + 1; x++)
-				{
-					int realX = xOffset + x;
-
-					if(realZ % 2 == 0)
-					{
-						indices[idx++] = (realZ * mFineWidth) + realX;
-						indices[idx++] = ((realZ+1) * mFineWidth) + realX;
-					}
-					else
-					{
-						if(x == 0)
-							indices[idx++] = ((realZ+1) * mFineWidth) + realX;
-
-						indices[idx++] = ((realZ+1) * mFineWidth) + realX;
-						indices[idx++] = (realZ * mFineWidth) + realX;
-					}
-				}
-
-				indices[idx++] = 0xFFFFFFFF;
+				if(x % 2 == z % 2)
+					indices[idx++] = (triIndices0[j] == R) ? R : triIndices0[j] + indexOffset;
+				else
+					indices[idx++] = (triIndices1[j] == R) ? R : triIndices1[j] + indexOffset;
 			}
 
-		}
+			indexOffset += numSubVerts;
+		}		
 	}
-
-	/*for(uint z = 0; z < mFineHeight - 1; z++)
-	{
-		if(z % 2 == 0)
-		{
-			for(uint x = 0; x < mFineWidth; x++)
-			{
-				indices[idx++] = (z * mFineWidth) + x;
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-			}
-		}
-		else
-		{
-			for(int x = mFineWidth - 1; x >= 0; x--)
-			{
-				indices[idx++] = (z * mFineWidth) + x;
-				indices[idx++] = ((z+1) * mFineWidth) + x;
-			}
-		}
-
-		indices[idx++] = 0xFFFFFFFF;
-	}*/
-
 
 	D3D_BUFFER_DESC ibDesc = CREATE_D3D_BUFFER_DESC(sizeof(unsigned int) * mNumIndices, D3D_USAGE_IMMUTABLE, D3D_BIND_INDEX_BUFFER, 0, 0, 0);
 	D3D_SUBRESOURCE_DATA ibInitData = { indices, 0, 0 };
@@ -478,12 +640,15 @@ Terrain::Terrain(ID3DDevice* device, ID3DDeviceContext* context, char* mapFilena
 	samplerDesc.AddressW = D3D_TEXTURE_ADDRESS_CLAMP;
 	hr = device->CreateSamplerState(&samplerDesc, &mSampler);
 
-	D3D_INPUT_ELEMENT_DESC layout[2] = 
+	D3D_INPUT_ELEMENT_DESC layout[4] = 
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D_INPUT_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32_UINT, 0, 8, D3D_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 1, DXGI_FORMAT_R8G8B8A8_UINT, 0, 36, D3D_INPUT_PER_VERTEX_DATA, 0 },
+		
 		//{ "TEXCOORD", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D_INPUT_PER_VERTEX_DATA, 0 },
-		//{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D_INPUT_PER_VERTEX_DATA, 0 },
+		
 		//{ "TEXCOORD", 2, DXGI_FORMAT_R32_UINT, 0, 36, D3D_INPUT_PER_VERTEX_DATA, 0 }
 		//{ "TEXCOORD", 1, DXGI_FORMAT_R32_SINT, 0, 20, D3D10_INPUT_PER_VERTEX_DATA, 0 },
 	};

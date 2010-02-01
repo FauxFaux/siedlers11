@@ -21,8 +21,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug D3D10|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			>
@@ -93,8 +93,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug D3D10|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			>
@@ -166,8 +166,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release D3D10|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
@@ -209,7 +209,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="d3d11.lib d3dx11.lib d3d10.lib d3dx10.lib"
+				AdditionalDependencies="d3d11.lib d3dx11.lib d3d10.lib d3dx10.lib dxgi.lib"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="2"
@@ -241,8 +241,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release D3D10|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
@@ -317,8 +317,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug D3D11|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			>
@@ -389,8 +389,8 @@
 		</Configuration>
 		<Configuration
 			Name="Debug D3D11|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			>
@@ -462,8 +462,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release D3D11|Win32"
-			OutputDirectory="$(SolutionDir)$(ConfigurationName)"
-			IntermediateDirectory="$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="1"
@@ -537,8 +537,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release D3D11|x64"
-			OutputDirectory="$(SolutionDir)$(PlatformName)\$(ConfigurationName)"
-			IntermediateDirectory="$(PlatformName)\$(ConfigurationName)"
+			OutputDirectory="$(SolutionDir)../Build/$(PlatformName)/$(ConfigurationName)"
+			IntermediateDirectory="Intermediate/$(PlatformName)/$(ConfigurationName)"
 			ConfigurationType="1"
 			CharacterSet="2"
 			WholeProgramOptimization="1"

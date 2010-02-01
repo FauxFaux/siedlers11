@@ -5,7 +5,8 @@ cbuffer camera
 
 struct GS_IN
 {
-	float3 position : POSITION;
+	uint vertexID : TEXCOORD0;
+	//float3 position : POSITION;
 	//float height : TEXCOORD0;
 	//float2 texCoord : TEXCOORD;
 	//uint3 matIDs : TEXCOORD1;
@@ -15,64 +16,103 @@ struct GS_IN
 struct GS_OUT
 {
 	float4 position : SV_POSITION;
-	float height : TEXCOORD0;
+	//float height : TEXCOORD0;
 	//float2 texCoord : TEXCOORD;
 	//uint3 matIDs : TEXCOORD1;
 	//float3 blendWeights : TEXCOORD3;
 };
 
-[maxvertexcount(3)]
-void main(triangle GS_IN input[3], inout TriangleStream<GS_OUT> OutputStream)
+[maxvertexcount(24)]
+void main(point GS_IN input[1], inout TriangleStream<GS_OUT> OutputStream)
 {
-/*
-	input[0].position = mul(wvp, float4(input[0].position.x, input[0].height, input[0].position.y, 1));
-	input[1].position = mul(wvp, float4(input[1].position.x, input[1].height, input[1].position.y, 1));
-	input[2].position = mul(wvp, float4(input[2].position.x, input[2].height, input[2].position.y, 1));
+	
 
-	OutputStream.Append(input[0]);
-	OutputStream.Append(input[1]);
-	OutputStream.Append(input[2]);
+	const float xDiff = 1.5f;
+	const float zDiff = 1.299f;
 	
-	GS_OUT outputVert = (GS_OUT)0;
+	float xOffset = (input[0].vertexID % 860) * (xDiff * 4);
+	float zOffset = (input[0].vertexID / 860) * (zDiff * 4);
+	float vertexID = input[0].vertexID * xDiff * 4;
+
+	float4 pos[15];
 	
-	for(int i = 0; i < 3; i++)
-	{
-		outputVert.height = input[i].position.y;
-		outputVert.position = mul(wvp, float4(input[i].position, 1));
-		OutputStream.Append(outputVert);
-	}
+	pos[0] = mul(wvp, float4(xOffset + (xDiff * 0.0f), 0, zOffset + (zDiff * 0.0f), 1));
+	pos[1] = mul(wvp, float4(xOffset + (xDiff * 1.0f), 0, zOffset + (zDiff * 0.0f), 1));
+	pos[2] = mul(wvp, float4(xOffset + (xDiff * 2.0f), 0, zOffset + (zDiff * 0.0f), 1));
+	pos[3] = mul(wvp, float4(xOffset + (xDiff * 3.0f), 0, zOffset + (zDiff * 0.0f), 1));
+	pos[4] = mul(wvp, float4(xOffset + (xDiff * 4.0f), 0, zOffset + (zDiff * 0.0f), 1));
 	
-	OutputStream.RestartStrip();*/
+	pos[5] = mul(wvp, float4(xOffset + (xDiff * 0.5f), 0, zOffset + (zDiff * 1.0f), 1));
+	pos[6] = mul(wvp, float4(xOffset + (xDiff * 1.5f), 0, zOffset + (zDiff * 1.0f), 1));
+	pos[7] = mul(wvp, float4(xOffset + (xDiff * 2.5f), 0, zOffset + (zDiff * 1.0f), 1));
+	pos[8] = mul(wvp, float4(xOffset + (xDiff * 3.5f), 0, zOffset + (zDiff * 1.0f), 1));
 	
-	float4 pos[3];
-	pos[0] = mul(wvp, float4(input[0].position, 1));
-	pos[1] = mul(wvp, float4(input[1].position, 1));
-	pos[2] = mul(wvp, float4(input[2].position, 1));
+	pos[9] =  mul(wvp, float4(xOffset + (xDiff * 1.0f), 0, zOffset + (zDiff * 2.0f), 1));
+	pos[10] = mul(wvp, float4(xOffset + (xDiff * 2.0f), 0, zOffset + (zDiff * 2.0f), 1));
+	pos[11] = mul(wvp, float4(xOffset + (xDiff * 3.0f), 0, zOffset + (zDiff * 2.0f), 1));
 	
-	float4 t0 = saturate(pos[0].xyxy * float4(-1, -1, 1, 1) - pos[0].w);
-	float4 t1 = saturate(pos[1].xyxy * float4(-1, -1, 1, 1) - pos[1].w);
-	float4 t2 = saturate(pos[2].xyxy * float4(-1, -1, 1, 1) - pos[2].w);
-	float4 t = t0 * t1 * t2;
+	pos[12] = mul(wvp, float4(xOffset + (xDiff * 1.5f), 0, zOffset + (zDiff * 3.0f), 1));
+	pos[13] = mul(wvp, float4(xOffset + (xDiff * 2.5f), 0, zOffset + (zDiff * 3.0f), 1));
 	
-	[branch]
-	if(!any(t))
-	{
-		//float2 d0 = pos[1].xy * pos[0].w - pos[0].xy * pos[1].w;
-		//float2 d1 = pos[2].xy * pos[0].w - pos[0].xy * pos[2].w;
-		
-		//[branch]
-		//if(d1.x * d0.y > d0.x * d1.y || min(min(pos[0].w, pos[1].w), pos[2].w) < 0.0)
-		{	
-			GS_OUT vert = (GS_OUT)0;
-			
-			[unroll]for(int i = 0; i < 3; i++)
-			{
-				vert.position = pos[i];
-				vert.height = input[i].position.y;
-				OutputStream.Append(vert);
-			}
-			
-			OutputStream.RestartStrip();
-		}
-	}
+	pos[14] = mul(wvp, float4(xOffset + (xDiff * 2.0f), 0, zOffset + (zDiff * 4.0f), 1));
+	
+	GS_OUT vert = (GS_OUT)0;
+	
+	vert.position = pos[0];
+	OutputStream.Append(vert);
+	vert.position = pos[5];
+	OutputStream.Append(vert);
+	vert.position = pos[1];
+	OutputStream.Append(vert);
+	vert.position = pos[6];
+	OutputStream.Append(vert);
+	vert.position = pos[2];
+	OutputStream.Append(vert);
+	vert.position = pos[7];
+	OutputStream.Append(vert);
+	vert.position = pos[3];
+	OutputStream.Append(vert);
+	vert.position = pos[8];
+	OutputStream.Append(vert);
+	vert.position = pos[4];
+	OutputStream.Append(vert);
+	
+	OutputStream.RestartStrip();
+	
+	vert.position = pos[5];
+	OutputStream.Append(vert);
+	vert.position = pos[9];
+	OutputStream.Append(vert);
+	vert.position = pos[6];
+	OutputStream.Append(vert);
+	vert.position = pos[10];
+	OutputStream.Append(vert);
+	vert.position = pos[7];
+	OutputStream.Append(vert);
+	vert.position = pos[11];
+	OutputStream.Append(vert);
+	vert.position = pos[8];
+	OutputStream.Append(vert);
+	
+	OutputStream.RestartStrip();
+	
+	vert.position = pos[9];
+	OutputStream.Append(vert);
+	vert.position = pos[12];
+	OutputStream.Append(vert);
+	vert.position = pos[10];
+	OutputStream.Append(vert);
+	vert.position = pos[13];
+	OutputStream.Append(vert);
+	vert.position = pos[11];
+	OutputStream.Append(vert);
+	
+	OutputStream.RestartStrip();
+	
+	vert.position = pos[12];
+	OutputStream.Append(vert);
+	vert.position = pos[14];
+	OutputStream.Append(vert);	
+	vert.position = pos[13];
+	OutputStream.Append(vert);
 }

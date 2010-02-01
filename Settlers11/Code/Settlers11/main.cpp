@@ -210,7 +210,7 @@ public:
 		g_context->PSSetShaderResources(0, 1, &mSRV);
 		g_context->VSSetShader(VS_SET_SHADER_ARGS(g_vs, NULL, 0));
 		g_context->PSSetShader(PS_SET_SHADER_ARGS(g_fs, NULL, 0));
-		g_context->GSSetShader(GS_SET_SHADER_ARGS(g_gs, NULL, 0));
+		//g_context->GSSetShader(GS_SET_SHADER_ARGS(g_gs, NULL, 0));
 
 		//g_context->DrawIndexed(mNumIndices, 0, 0);
 	}
@@ -466,19 +466,20 @@ HRESULT InitDevice()
 
 
 	model = new Model("Z:/S2C/Development/data/animals/elk.GR2.smd");
-	terrain = new Terrain(g_d3dDevice, g_context, "Z:/S2C/Development/data/maps/freeGameMaps/Southshore11.s2m");
+	terrain = new Terrain(g_d3dDevice, g_context, "Z:/S2C/Development/data/maps/freeGameMaps/Southshore11.s11map");
 	
 
 
 
-	D3D_BUFFER_DESC cbDesc = CREATE_D3D_BUFFER_DESC(sizeof(XMMATRIX), D3D_USAGE_DYNAMIC, D3D_BIND_CONSTANT_BUFFER, D3D_CPU_ACCESS_WRITE, 0, 0);
+	D3D_BUFFER_DESC cbDesc = CREATE_D3D_BUFFER_DESC(sizeof(XMMATRIX) + 16, D3D_USAGE_DYNAMIC, D3D_BIND_CONSTANT_BUFFER, D3D_CPU_ACCESS_WRITE, 0, 0);
 	hr = g_d3dDevice->CreateBuffer(&cbDesc, NULL, &g_cb);
 
 	if(FAILED(hr))
 		return hr;
 
-	//g_context->VSSetConstantBuffers(0, 1, &g_cb);
-	g_context->GSSetConstantBuffers(0, 1, &g_cb);
+	g_context->VSSetConstantBuffers(0, 1, &g_cb);
+	g_context->PSSetConstantBuffers(0, 1, &g_cb);
+	//g_context->GSSetConstantBuffers(0, 1, &g_cb);
 
 
 	D3D_RASTERIZER_DESC rasterizerDesc;
@@ -557,13 +558,14 @@ void Render()
 	XMMATRIX view = XMMatrixLookAtRH(XMVectorSet(-100 + f, 500*m, -300 * 1.2f, 1), XMVectorSet(-100 + f, 0, -300 * 1.33333f, 1), XMVectorSet(0, 1, 0, 0));
 	XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(60), (float)windowWidth/(float)windowHeight, 2.0f, 1500.0f);*/
 
-	f += 0.01f;
+	f += 0.05f;
 
-	float radius = 500 - (f * 10);
-	float height = 600 - (f * 10);
+	float radius = 600;
+	float height = 0;
 
-	XMVECTOR viewPoint = XMVectorSet(500, 0, 400, 1);
-	XMVECTOR cameraPosition = XMVectorSet(sin(f) * radius, height, cos(f) * radius, 1) + viewPoint;
+	XMVECTOR viewPoint = XMVectorSet(500, 0, 500, 1);
+	XMVECTOR cameraPosition = XMVectorSet(sin(0.0f) * radius, 500, cos(0.0f) * radius, 1) + viewPoint;
+	XMVECTOR lightPosition = XMVectorSet(sin(f) * 400, 100, cos(f) * 400, 1) + viewPoint;
 
 	//float radius = 20;
 	//float height = 20;
@@ -573,7 +575,7 @@ void Render()
 
 	XMMATRIX world = XMMatrixRotationRollPitchYaw(0, 0, 0);
 	XMMATRIX view = XMMatrixLookAtLH(cameraPosition, viewPoint, XMVectorSet(0, 1, 0, 0));
-	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60), (float)windowWidth/(float)windowHeight, 10.0f, 5000.0f);
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60), (float)windowWidth/(float)windowHeight, 1.0f, 5000.0f);
 
 	XMMATRIX viewProj = XMMatrixMultiply(XMMatrixMultiply(world, view), proj);
 
@@ -583,6 +585,11 @@ void Render()
 	void* mappedResource;
 	HRESULT hr = g_cb->Map(D3D_MAP_WRITE_DISCARD, 0, &mappedResource);
 	memcpy(mappedResource, &viewProj, sizeof(XMMATRIX));
+	char* lightPosPtr = (char*)mappedResource + sizeof(XMMATRIX);
+	float* lightPos = (float*)lightPosPtr;
+	lightPos[0] = XMVectorGetX(lightPosition);
+	lightPos[1] = XMVectorGetY(lightPosition);
+	lightPos[2] = XMVectorGetZ(lightPosition);
 	g_cb->Unmap();
 #else
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
