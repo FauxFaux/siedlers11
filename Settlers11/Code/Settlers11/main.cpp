@@ -2,6 +2,7 @@
 
 #include <xnamath.h>
 #include <assert.h>
+#include <dinput.h>
 
 #include "D3DCompat.h"
 #include "Terrain.h"
@@ -26,6 +27,9 @@ ID3DGeometryShader* g_gs = NULL;
 ID3DBuffer* g_cb = NULL;
 ID3DRasterizerState* g_rs = NULL;
 ID3DDepthStencilState* g_ds = NULL;
+
+LPDIRECTINPUT8 g_Input;
+LPDIRECTINPUTDEVICE8  g_KB; 
 
 
 RECT g_windowRect;
@@ -252,7 +256,7 @@ HRESULT RecreateViews()
 	depthDesc.MipLevels = 1;
 	depthDesc.ArraySize = 1;
 	depthDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthDesc.SampleDesc.Count = 1;
+	depthDesc.SampleDesc.Count = 4;
 	depthDesc.SampleDesc.Quality = 0;
 	depthDesc.Usage = D3D_USAGE_DEFAULT;
 	depthDesc.BindFlags = D3D_BIND_DEPTH_STENCIL;
@@ -269,10 +273,10 @@ HRESULT RecreateViews()
 #if !defined(D3D10_OVERRIDE)
 	dsvDesc.Flags = 0;
 #endif
-	dsvDesc.ViewDimension = D3D_DSV_DIMENSION_TEXTURE2D;
+	dsvDesc.ViewDimension = D3D_DSV_DIMENSION_TEXTURE2DMS;
 	dsvDesc.Texture2D.MipSlice = 0;
 
-	hr = g_d3dDevice->CreateDepthStencilView(depthTexture, &dsvDesc, &g_dsv);
+	hr = g_d3dDevice->CreateDepthStencilView(depthTexture, NULL, &g_dsv);
 
 	SAFE_RELEASE(depthTexture);
 
@@ -384,7 +388,7 @@ HRESULT InitDevice()
 	swapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.OutputWindow = g_hWnd;
-	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Count = 4;
 	swapChainDesc.SampleDesc.Quality = 0;
 	swapChainDesc.Windowed = true;
 
@@ -491,7 +495,7 @@ HRESULT InitDevice()
 	rasterizerDesc.SlopeScaledDepthBias = 0;
 	rasterizerDesc.DepthClipEnable = true;
 	rasterizerDesc.ScissorEnable = false;
-	rasterizerDesc.MultisampleEnable = false;
+	rasterizerDesc.MultisampleEnable = true;
 	rasterizerDesc.AntialiasedLineEnable = false;
 
 	g_d3dDevice->CreateRasterizerState(&rasterizerDesc, &g_rs);
@@ -541,9 +545,54 @@ float f = 3.1415;
 
 float m = 1;
 
+XMVECTOR cameraPosition = XMVectorSet(0, 0, 0, 1);
+XMVECTOR cameraBaseForward = XMVectorSet(0, 0, 1, 0);
+XMVECTOR cameraBaseUp = XMVectorSet(0, 1, 0, 0);
+XMVECTOR cameraBaseRight = XMVectorSet(1, 0, 0, 0);
+
+XMVECTOR rotatedForward;
+XMVECTOR rotatedUp;
+XMVECTOR rotatedRight;
+
+float yaw = 0, pitch = 0, roll = 0;
+
 void Render()
 {
+#define KEYDOWN(name, key) (name[key] & 0x80) 
 	
+
+	char buffer[256];
+	ZeroMemory(buffer, sizeof(buffer));
+	HRESULT hr = g_KB->GetDeviceState(sizeof(buffer), (LPVOID)&buffer);
+
+	if(hr != S_OK)
+	{
+		hr = g_KB->Acquire();
+	}
+
+	float strafeSpeed = 1.0f;
+	float pitchSpeed = 0.01f;
+
+	if(KEYDOWN(buffer, DIK_D))
+		cameraPosition = XMVectorAdd(cameraPosition, XMVectorScale(rotatedRight, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_A))
+		cameraPosition = XMVectorSubtract(cameraPosition, XMVectorScale(rotatedRight, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_Q))
+		cameraPosition = XMVectorAdd(cameraPosition, XMVectorScale(rotatedUp, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_Z))
+		cameraPosition = XMVectorSubtract(cameraPosition, XMVectorScale(rotatedUp, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_W))
+		cameraPosition = XMVectorAdd(cameraPosition, XMVectorScale(rotatedForward, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_S))
+		cameraPosition = XMVectorSubtract(cameraPosition, XMVectorScale(rotatedForward, strafeSpeed));
+	if(KEYDOWN(buffer, DIK_UP))
+		pitch += pitchSpeed;
+	if(KEYDOWN(buffer, DIK_DOWN))
+		pitch -= pitchSpeed;
+	if(KEYDOWN(buffer, DIK_LEFT))
+		yaw -= pitchSpeed;
+	if(KEYDOWN(buffer, DIK_RIGHT))
+		yaw += pitchSpeed;
 
 	int windowWidth = g_windowRect.right - g_windowRect.left;
 	int windowHeight = g_windowRect.bottom - g_windowRect.top;
@@ -558,14 +607,14 @@ void Render()
 	XMMATRIX view = XMMatrixLookAtRH(XMVectorSet(-100 + f, 500*m, -300 * 1.2f, 1), XMVectorSet(-100 + f, 0, -300 * 1.33333f, 1), XMVectorSet(0, 1, 0, 0));
 	XMMATRIX proj = XMMatrixPerspectiveFovRH(XMConvertToRadians(60), (float)windowWidth/(float)windowHeight, 2.0f, 1500.0f);*/
 
-	f += 0.05f;
+	f += 0.005f;
 
-	float radius = 600;
+	float radius = 100;
 	float height = 0;
 
-	XMVECTOR viewPoint = XMVectorSet(500, 0, 500, 1);
-	XMVECTOR cameraPosition = XMVectorSet(sin(0.0f) * radius, 500, cos(0.0f) * radius, 1) + viewPoint;
-	XMVECTOR lightPosition = XMVectorSet(sin(f) * 400, 100, cos(f) * 400, 1) + viewPoint;
+	//XMVECTOR viewPoint = XMVectorSet(175, 0, 175, 1);
+	
+	XMVECTOR lightPosition = XMVectorSet(sin(f) * 400, 300, cos(f) * 400, 1) + XMVectorSet(500, 0, 500, 1);
 
 	//float radius = 20;
 	//float height = 20;
@@ -573,9 +622,14 @@ void Render()
 	//XMVECTOR viewPoint = XMVectorSet(0, 0, 0, 1);
 	//XMVECTOR cameraPosition = XMVectorSet(sin(f) * radius, height, cos(f) * radius, 1) + viewPoint;
 
+	XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(pitch, yaw, roll);
+	rotatedForward = XMVector3TransformNormal(cameraBaseForward, rotationMatrix);
+	rotatedUp = XMVector3TransformNormal(cameraBaseUp, rotationMatrix);
+	rotatedRight = XMVector3TransformNormal(cameraBaseRight, rotationMatrix);
+
 	XMMATRIX world = XMMatrixRotationRollPitchYaw(0, 0, 0);
-	XMMATRIX view = XMMatrixLookAtLH(cameraPosition, viewPoint, XMVectorSet(0, 1, 0, 0));
-	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(60), (float)windowWidth/(float)windowHeight, 1.0f, 5000.0f);
+	XMMATRIX view = XMMatrixLookAtLH(cameraPosition, XMVectorAdd(cameraPosition, rotatedForward), rotatedUp);
+	XMMATRIX proj = XMMatrixPerspectiveFovLH(XMConvertToRadians(50), (float)windowWidth/(float)windowHeight, 1.0f, 5000.0f);
 
 	XMMATRIX viewProj = XMMatrixMultiply(XMMatrixMultiply(world, view), proj);
 
@@ -583,7 +637,7 @@ void Render()
 
 #if defined(D3D10_OVERRIDE)
 	void* mappedResource;
-	HRESULT hr = g_cb->Map(D3D_MAP_WRITE_DISCARD, 0, &mappedResource);
+	hr = g_cb->Map(D3D_MAP_WRITE_DISCARD, 0, &mappedResource);
 	memcpy(mappedResource, &viewProj, sizeof(XMMATRIX));
 	char* lightPosPtr = (char*)mappedResource + sizeof(XMMATRIX);
 	float* lightPos = (float*)lightPosPtr;
@@ -620,6 +674,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	ShowWindow( g_hWnd, nCmdShow );
+
+	HRESULT hr = DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&g_Input, NULL);
+
+	if(hr == S_OK)
+	{
+		hr = g_Input->CreateDevice(GUID_SysKeyboard, &g_KB, NULL);
+		assert(hr == S_OK);
+		hr = g_KB->SetDataFormat(&c_dfDIKeyboard);
+		hr = g_KB->SetCooperativeLevel(g_hWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+
+		if(g_KB)
+			g_KB->Acquire();
+	}
 
 	MSG msg = {0};
 
